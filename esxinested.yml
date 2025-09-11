@@ -1,5 +1,4 @@
 ---
-
 - name: List hosts in ESXi
   ansible.builtin.debug:
     msg: "Host: {{ item }}"
@@ -38,12 +37,12 @@
         state: poweredoff
         cluster: "{{ vc_cluster | split('/') | last }}"
         datacenter: "{{ vc_datacenter }}"
-        name: '{{ host_fact_hostname }}'
+        name: "{{ host_fact_hostname }}"
         folder: "{{ vc_folder }}"
         datastore: "{{ vc_datastore }}"
         vapp_properties:
-        - id: guestinfo.password
-          value: "{{ vc_fact_password }}" # SSO Password for administrator@vsphere.local
+          - id: guestinfo.password
+            value: "{{ vc_fact_password }}" # SSO Password for administrator@vsphere.local
         hardware:
           memory_mb: "{{ esximemory }}"
           num_cpu_cores_per_socket: "{{ esxicpu }}"
@@ -63,7 +62,7 @@
     state: present
     network_name: "{{ item.network_name | default(omit) }}"
     connected: "{{ item.connected | default(omit) }}"
-    label:  "{{ item.label | default(omit) }}"
+    label: "{{ item.label | default(omit) }}"
     device_type: vmxnet3
   loop:
     - network_name: "{{ vc_fact_deployment_network }}"
@@ -82,13 +81,56 @@
         controller_number: "{{ item.controller_number }}"
         controller_type: "{{ item.controller_type }}"
         size_gb: 1024
-        type: 'thin'
+        type: "thin"
     state: present
   loop:
     - unit_number: 2
       controller_number: 0
       controller_type: "paravirtual"
 
+# Optionally pin this VM to a specific host via a VM-Host DRS rule
+- name: Compute target host for VM pinning
+  ansible.builtin.set_fact:
+    pin_hosts_clean: "{{ vc_pin_hosts | map('trim') | list }}"
+  when: vc_pin_vms_to_hosts == 'true' and (vc_pin_hosts | length) > 0
+
+- name: Select host in round-robin for VM pinning
+  ansible.builtin.set_fact:
+    selected_pin_host: "{{ pin_hosts_clean[(my_idx | int) % (pin_hosts_clean | length)] }}"
+  when: vc_pin_vms_to_hosts == 'true' and (vc_pin_hosts | length) > 0
+
+- name: Create Host DRS group for pinning
+  community.vmware.vmware_drs_group:
+    datacenter: "{{ vc_datacenter }}"
+    cluster_name: "{{ vc_cluster | split('/') | last }}"
+    group_name: "{{ host_fact_hostname }}-hostgrp"
+    hosts:
+      - "{{ selected_pin_host }}"
+    state: present
+  when: vc_pin_vms_to_hosts == 'true' and (vc_pin_hosts | length) > 0
+
+- name: Create VM DRS group for pinning
+  community.vmware.vmware_drs_group:
+    datacenter: "{{ vc_datacenter }}"
+    cluster_name: "{{ vc_cluster | split('/') | last }}"
+    group_name: "{{ host_fact_hostname }}-vmgrp"
+    vms:
+      - "{{ host_fact_hostname }}"
+    state: present
+  when: vc_pin_vms_to_hosts == 'true' and (vc_pin_hosts | length) > 0
+
+- name: Create VM-Host DRS rule to pin VM to host
+  community.vmware.vmware_vm_host_drs_rule:
+    datacenter: "{{ vc_datacenter }}"
+    cluster_name: "{{ vc_cluster | split('/') | last }}"
+    drs_rule_name: "{{ host_fact_hostname }}-pin-to-{{ selected_pin_host }}"
+    vm_group_name: "{{ host_fact_hostname }}-vmgrp"
+    host_group_name: "{{ host_fact_hostname }}-hostgrp"
+    affinity_rule: true
+    mandatory: "{{ vc_pin_mandatory | bool }}"
+    enabled: true
+    state: present
+  when: vc_pin_vms_to_hosts == 'true' and (vc_pin_hosts | length) > 0
 
 - name: "poweron virtual machine {{ host_fact_hostname }} version {{ version }}"
   community.vmware.vmware_guest:
@@ -117,7 +159,7 @@
     datacenter: "{{ vc_datacenter }}"
     name: "{{ host_fact_hostname }}"
   register: nested_vm
-  until: nested_vm.instance.ipv4 != None 
+  until: nested_vm.instance.ipv4 != None
   retries: 10
   delay: 30
 
@@ -127,7 +169,7 @@
 
 - name: Add host to group esxi
   ansible.builtin.add_host:
-    name: '{{ host_fact_hostname }}'
+    name: "{{ host_fact_hostname }}"
     groups: esxi
     NESTEDVMIP: "{{ nested_vm.instance.ipv4 }}"
 

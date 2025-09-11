@@ -38,6 +38,20 @@ Canonical repo for nested-ova-ansible in CI. Provisions nested vCenter and ESXi 
 - `MEMORY`                   - optional: the amount of memory in GB assigned to the nested VMs. The resources required for the vCenter(s) are not to be included. The default is 96 GB
 - `DISKGB`                   - optional: the amount of disk space in GB assigned to the nested host local datastore. The resources required for the vCenter(s) are not to be included. The default is 1024 GB
 
+#### Optional: Pin created VMs to specific hosts (VM-Host DRS rule)
+
+If you want each created nested ESXi VM to be locked to a specific outer vSphere host, enable VM-Host DRS pinning. When enabled, for each ESXi VM we create a Host DRS group (with the selected host), a VM DRS group (with the VM), and a VM-Host DRS rule that is enabled and mandatory by default.
+
+Control via the following env vars:
+
+- `PIN_VMS_TO_HOSTS`  - Set to `true` to enable pinning. Default: `false`.
+- `PIN_HOSTS`         - Comma-separated list of ESXi host names in the outer cluster (e.g. `esx01.lab.local,esx02.lab.local`). VMs are assigned round-robin by index.
+- `PIN_MANDATORY`     - `true` for a mandatory "Must run on hosts in group" rule; `false` for a preferential rule. Default: `true`.
+
+Notes:
+- Pinning is applied during VM provisioning in `esxinested.yml` using `community.vmware.vmware_drs_group` and `community.vmware.vmware_vm_host_drs_rule`.
+- Ensure each host listed in `PIN_HOSTS` exists in the target cluster and has capacity for the pinned VM(s).
+
 ### Defining Media Assets
 
 Bespoke versions of vCenter and ESXi can deployed by defining elements in the `vc_assets` list in `group_vars/all.yml`. For example:

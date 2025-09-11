@@ -21,28 +21,40 @@ vc_allocated_disk: "{{ lookup('ansible.builtin.env', 'DISKGB', default=1024) }}"
 vc_skip_tagging: "{{ lookup('ansible.builtin.env', 'SKIP_FAILURE_DOMAIN_TAGGING', default='false') }}"
 vc_vcenter_host_map: {}
 
-vc_nfs_shares: 
-- {
-  "server": "161.26.99.159",
-  "name": "dsnested",
-  "path": "/DSW02SEV2284482_22/data01",
-  'type': 'nfs41', 
-  'nfs_ro': 'true'
-}
+vc_nfs_shares:
+  - {
+      "server": "161.26.99.159",
+      "name": "dsnested",
+      "path": "/DSW02SEV2284482_22/data01",
+      "type": "nfs41",
+      "nfs_ro": "true",
+    }
 
-vc_assets: 
-- {
-  'name': 'VC7.0.3.01400-21477706-ESXi7.0u3q',
-  'esxiova': 'Nested_ESXi7.0u3q_Appliance_Template_v1.ova',
-  'vcenterova': 'VMware-vCenter-Server-Appliance-7.0.3.01400-21477706_OVF10.ova',
-  'httpova': "10.93.245.232:8080"
-}
-- {
-  'name': 'VC8.0.2.00100-22617221-ESXi8.0u2c', 
-  'esxiova': 'Nested_ESXi8.0u2c_Appliance_Template_v1.ova',
-  'vcenterova': 'VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova',
-  'httpova': "10.93.245.232:8080",
-  'default': "true"
-}
+vc_assets:
+  - {
+      "name": "VC7.0.3.01400-21477706-ESXi7.0u3q",
+      "esxiova": "Nested_ESXi7.0u3q_Appliance_Template_v1.ova",
+      "vcenterova": "VMware-vCenter-Server-Appliance-7.0.3.01400-21477706_OVF10.ova",
+      "httpova": "10.93.245.232:8080",
+    }
+  - {
+      "name": "VC8.0.2.00100-22617221-ESXi8.0u2c",
+      "esxiova": "Nested_ESXi8.0u2c_Appliance_Template_v1.ova",
+      "vcenterova": "VMware-vCenter-Server-Appliance-8.0.2.00100-22617221_OVF10.ova",
+      "httpova": "10.93.245.232:8080",
+      "default": "true",
+    }
 
 ###### ADDITIONAL VARIABLES MAYBE DEFINED OR CHANGED BY DEFINING /tmp/override-vars.yaml ######
+
+# Optional: pin created VMs to specific hosts in the outer vCenter cluster
+# Enable with env PIN_VMS_TO_HOSTS=true
+vc_pin_vms_to_hosts: "{{ lookup('ansible.builtin.env', 'PIN_VMS_TO_HOSTS', default='false') }}"
+
+# Comma-separated list of ESXi host names in the outer cluster to pin to (round-robin by VM index)
+# Example: PIN_HOSTS="esx01.lab.local,esx02.lab.local"
+vc_pin_hosts: "{{ (lookup('ansible.builtin.env', 'PIN_HOSTS', default='') | split(',')) | select('length') | list }}"
+
+# Whether the rule is mandatory (Must run) or preferential (Should run)
+# Enable with env PIN_MANDATORY=true|false (default true)
+vc_pin_mandatory: "{{ lookup('ansible.builtin.env', 'PIN_MANDATORY', default='true') }}"
